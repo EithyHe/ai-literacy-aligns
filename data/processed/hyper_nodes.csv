@@ -1,0 +1,146 @@
+id,label,type
+it_000001,it_000001,item
+it_000002,it_000002,item
+it_000003,it_000003,item
+it_000004,it_000004,item
+it_000005,it_000005,item
+it_000006,it_000006,item
+it_000007,it_000007,item
+it_000008,it_000008,item
+it_000009,it_000009,item
+it_000010,it_000010,item
+it_000011,it_000011,item
+it_000012,it_000012,item
+it_000013,it_000013,item
+it_000014,it_000014,item
+it_000015,it_000015,item
+it_000016,it_000016,item
+it_000017,it_000017,item
+it_000018,it_000018,item
+it_000019,it_000019,item
+it_000020,it_000020,item
+it_000021,it_000021,item
+it_000022,it_000022,item
+it_000023,it_000023,item
+it_000024,it_000024,item
+it_000025,it_000025,item
+it_000026,it_000026,item
+it_000027,it_000027,item
+it_000028,it_000028,item
+it_000029,it_000029,item
+it_000030,it_000030,item
+it_000031,it_000031,item
+it_000032,it_000032,item
+it_000033,it_000033,item
+it_000034,it_000034,item
+it_000035,it_000035,item
+it_000036,it_000036,item
+it_000037,it_000037,item
+it_000038,it_000038,item
+it_000039,it_000039,item
+it_000040,it_000040,item
+it_000041,it_000041,item
+it_000042,it_000042,item
+it_000043,it_000043,item
+it_000044,it_000044,item
+it_000045,it_000045,item
+it_000046,it_000046,item
+it_000047,it_000047,item
+it_000048,it_000048,item
+it_000049,it_000049,item
+it_000050,it_000050,item
+it_000051,it_000051,item
+it_000052,it_000052,item
+it_000053,it_000053,item
+it_000054,it_000054,item
+it_000055,it_000055,item
+it_000056,it_000056,item
+it_000057,it_000057,item
+it_000058,it_000058,item
+it_000059,it_000059,item
+it_000060,it_000060,item
+it_000061,it_000061,item
+it_000062,it_000062,item
+it_000063,it_000063,item
+it_000064,it_000064,item
+it_000065,it_000065,item
+it_000066,it_000066,item
+it_000067,it_000067,item
+it_000068,it_000068,item
+it_000069,it_000069,item
+it_000070,it_000070,item
+it_000071,it_000071,item
+it_000072,it_000072,item
+it_000073,it_000073,item
+it_000074,it_000074,item
+it_000075,it_000075,item
+it_000076,it_000076,item
+it_000077,it_000077,item
+it_000078,it_000078,item
+it_000079,it_000079,item
+it_000080,it_000080,item
+it_000081,it_000081,item
+it_000082,it_000082,item
+it_000083,it_000083,item
+it_000084,it_000084,item
+it_000085,it_000085,item
+it_000086,it_000086,item
+it_000087,it_000087,item
+it_000088,it_000088,item
+it_000089,it_000089,item
+it_000090,it_000090,item
+it_000091,it_000091,item
+it_000092,it_000092,item
+it_000093,it_000093,item
+it_000094,it_000094,item
+it_000095,it_000095,item
+it_000096,it_000096,item
+it_000097,it_000097,item
+it_000098,it_000098,item
+it_000099,it_000099,item
+it_000100,it_000100,item
+it_000101,it_000101,item
+it_000102,it_000102,item
+it_000103,it_000103,item
+it_000104,it_000104,item
+it_000105,it_000105,item
+it_000106,it_000106,item
+it_000107,it_000107,item
+it_000108,it_000108,item
+it_000109,it_000109,item
+it_000110,it_000110,item
+it_000111,it_000111,item
+it_000112,it_000112,item
+it_000113,it_000113,item
+it_000114,it_000114,item
+it_000115,it_000115,item
+it_000116,it_000116,item
+it_000117,it_000117,item
+it_000118,it_000118,item
+it_000119,it_000119,item
+it_000120,it_000120,item
+it_000121,it_000121,item
+it_000122,it_000122,item
+it_000123,it_000123,item
+Intelligent TK,Intelligent TK,construct
+Intelligent TPK,Intelligent TPK,construct
+Intelligent TCK,Intelligent TCK,construct
+Intelligent TPACK,Intelligent TPACK,construct
+"Knowledge of the existence and potential of AI tools, understanding of how these tools could be integrated in learning, and a conceptual understanding of the criteria for the selection and use of AI resources.","Knowledge of the existence and potential of AI tools, understanding of how these tools could be integrated in learning, and a conceptual understanding of the criteria for the selection and use of AI resources.",construct
+Identification: Ability to identify and understand the basic principles of using AI,Identification: Ability to identify and understand the basic principles of using AI,construct
+"Practical experience: Hands-on experience using AI tools, including ability to use AI tools and integrate multiple AI resources for different purposes and improve your personal skills.","Practical experience: Hands-on experience using AI tools, including ability to use AI tools and integrate multiple AI resources for different purposes and improve your personal skills.",construct
+"Evaluation: The ability to critically evaluate the importance of AI in the learning process, not only ensuring the effective use of AI but also to understand and reflect on the wider implications of integrating AI into the learning process.","Evaluation: The ability to critically evaluate the importance of AI in the learning process, not only ensuring the effective use of AI but also to understand and reflect on the wider implications of integrating AI into the learning process.",construct
+"Ethical considerations: Ethical aspects of AI technologies, promoting a balanced approach that considers both integrations of AI benefits as well as potential ethical issues.","Ethical considerations: Ethical aspects of AI technologies, promoting a balanced approach that considers both integrations of AI benefits as well as potential ethical issues.",construct
+"Algorithmic thinking: Algorithmic thinking skills and how these skills contribute to general AI literacy. The purpose is to promote a proactive approach to developing these competencies, recognizing their value in moving forward more digital and AI-integrated educational environments.","Algorithmic thinking: Algorithmic thinking skills and how these skills contribute to general AI literacy. The purpose is to promote a proactive approach to developing these competencies, recognizing their value in moving forward more digital and AI-integrated educational environments.",construct
+The digital divide: The role of the educator in bridging the digital divide by emphasizing physical access to AI technologies importance as a cornerstone for developing AI literacy and ensuring that all students have the opportunity to benefit from an AI-enhanced learning experience.,The digital divide: The role of the educator in bridging the digital divide by emphasizing physical access to AI technologies importance as a cornerstone for developing AI literacy and ensuring that all students have the opportunity to benefit from an AI-enhanced learning experience.,construct
+"Cooperation skills: An approach to developing students’ cooperation skills, emphasizing the role of AI in effective teamwork and in promoting cooperative interaction both in the classroom and in the wider social and professional sphere in context.","Cooperation skills: An approach to developing students’ cooperation skills, emphasizing the role of AI in effective teamwork and in promoting cooperative interaction both in the classroom and in the wider social and professional sphere in context.",construct
+"Professional growth: The importance of self-determination, decision-making, and independent learning in the professional for development and evaluation in their practice.","Professional growth: The importance of self-determination, decision-making, and independent learning in the professional for development and evaluation in their practice.",construct
+"Making cross-curricular connections: How AI is used in learning, integrating AI so that tasks are related to real ones, and interdisciplinary connection to world problems.","Making cross-curricular connections: How AI is used in learning, integrating AI so that tasks are related to real ones, and interdisciplinary connection to world problems.",construct
+Understanding of AI,Understanding of AI,construct
+Perception Applying AI,Perception Applying AI,construct
+AI Ethics,AI Ethics,construct
+Methods to Enhance Teachers' AI Literacy,Methods to Enhance Teachers' AI Literacy,construct
+cluster_0,Cluster 0,cluster
+cluster_2,Cluster 2,cluster
+cluster_1,Cluster 1,cluster
+cluster_3,Cluster 3,cluster

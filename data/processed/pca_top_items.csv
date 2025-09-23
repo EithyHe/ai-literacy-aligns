@@ -1,0 +1,10 @@
+component,rank,item_id,score,text_norm,explained_variance_ratio
+PC1,1,it_000101,-1.1829581,how impact do you believe ai techniques would be in processing and analyzing educational data for research?,0.47074344754219055
+PC1,2,it_000102,-1.1756196,how applicable do you believe the benefits of ai integration in education are?,0.47074344754219055
+PC1,3,it_000099,-1.1690775,how important do you believe ai will be in shaping future educational practices?,0.47074344754219055
+PC2,1,it_000015,-0.91079235,i can use ai-based tools to better understand the contents of my teaching field.,0.24732060730457306
+PC2,2,it_000013,-0.88814455,i can use ai-based tools to search for educational material in my teaching field.,0.24732060730457306
+PC2,3,it_000006,-0.88360727,i can understand the pedagogical contribution of ai-based tools to my teaching field.,0.24732060730457306
+PC3,1,it_000116,-0.75211334,would a platform that evaluates and discloses the fairness levels of ai tools influence your likelihood of using them?,0.12733431160449982
+PC3,2,it_000115,-0.7401272,are you familiar with the potential biases that can arise from ai tools in an educational setting?,0.12733431160449982
+PC3,3,it_000113,-0.72822994,how likely would you use an ai tool in your teaching if it provided clear interpretations of its outcomes?,0.12733431160449982

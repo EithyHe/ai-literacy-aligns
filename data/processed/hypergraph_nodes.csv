@@ -1,0 +1,13 @@
+id,label,type
+it_000001,Item 1,item
+it_000002,Item 2,item
+it_000003,Item 3,item
+it_000004,Item 4,item
+it_000005,Item 5,item
+AI Literacy,AI Literacy,construct
+Digital Skills,Digital Skills,construct
+Critical Thinking,Critical Thinking,construct
+Ethics,Ethics,construct
+cluster_0,Cluster 0,cluster
+cluster_1,Cluster 1,cluster
+cluster_2,Cluster 2,cluster

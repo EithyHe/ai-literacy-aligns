@@ -1,0 +1,16 @@
+src,dst,rel,weight
+it_000001,AI Literacy,item_construct,1.0
+it_000002,AI Literacy,item_construct,1.0
+it_000003,Digital Skills,item_construct,1.0
+it_000004,Digital Skills,item_construct,1.0
+it_000005,Critical Thinking,item_construct,1.0
+it_000001,cluster_0,item_cluster,1.0
+it_000002,cluster_0,item_cluster,1.0
+it_000003,cluster_1,item_cluster,1.0
+it_000004,cluster_1,item_cluster,1.0
+it_000005,cluster_2,item_cluster,1.0
+AI Literacy,cluster_0,construct_cluster,2.0
+Digital Skills,cluster_1,construct_cluster,2.0
+Critical Thinking,cluster_2,construct_cluster,1.0
+Ethics,cluster_0,construct_cluster,1.0
+Ethics,cluster_1,construct_cluster,1.0

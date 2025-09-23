@@ -1,0 +1,170 @@
+{
+  "nodes": [
+    {
+      "id": "it_000001",
+      "label": "Item 1",
+      "type": "item"
+    },
+    {
+      "id": "it_000002",
+      "label": "Item 2",
+      "type": "item"
+    },
+    {
+      "id": "it_000003",
+      "label": "Item 3",
+      "type": "item"
+    },
+    {
+      "id": "it_000004",
+      "label": "Item 4",
+      "type": "item"
+    },
+    {
+      "id": "it_000005",
+      "label": "Item 5",
+      "type": "item"
+    },
+    {
+      "id": "AI Literacy",
+      "label": "AI Literacy",
+      "type": "construct"
+    },
+    {
+      "id": "Digital Skills",
+      "label": "Digital Skills",
+      "type": "construct"
+    },
+    {
+      "id": "Critical Thinking",
+      "label": "Critical Thinking",
+      "type": "construct"
+    },
+    {
+      "id": "Ethics",
+      "label": "Ethics",
+      "type": "construct"
+    },
+    {
+      "id": "cluster_0",
+      "label": "Cluster 0",
+      "type": "cluster"
+    },
+    {
+      "id": "cluster_1",
+      "label": "Cluster 1",
+      "type": "cluster"
+    },
+    {
+      "id": "cluster_2",
+      "label": "Cluster 2",
+      "type": "cluster"
+    }
+  ],
+  "edges": [
+    {
+      "src": "it_000001",
+      "dst": "AI Literacy",
+      "rel": "item_construct",
+      "weight": 1.0
+    },
+    {
+      "src": "it_000002",
+      "dst": "AI Literacy",
+      "rel": "item_construct",
+      "weight": 1.0
+    },
+    {
+      "src": "it_000003",
+      "dst": "Digital Skills",
+      "rel": "item_construct",
+      "weight": 1.0
+    },
+    {
+      "src": "it_000004",
+      "dst": "Digital Skills",
+      "rel": "item_construct",
+      "weight": 1.0
+    },
+    {
+      "src": "it_000005",
+      "dst": "Critical Thinking",
+      "rel": "item_construct",
+      "weight": 1.0
+    },
+    {
+      "src": "it_000001",
+      "dst": "cluster_0",
+      "rel": "item_cluster",
+      "weight": 1.0
+    },
+    {
+      "src": "it_000002",
+      "dst": "cluster_0",
+      "rel": "item_cluster",
+      "weight": 1.0
+    },
+    {
+      "src": "it_000003",
+      "dst": "cluster_1",
+      "rel": "item_cluster",
+      "weight": 1.0
+    },
+    {
+      "src": "it_000004",
+      "dst": "cluster_1",
+      "rel": "item_cluster",
+      "weight": 1.0
+    },
+    {
+      "src": "it_000005",
+      "dst": "cluster_2",
+      "rel": "item_cluster",
+      "weight": 1.0
+    },
+    {
+      "src": "AI Literacy",
+      "dst": "cluster_0",
+      "rel": "construct_cluster",
+      "weight": 2.0
+    },
+    {
+      "src": "Digital Skills",
+      "dst": "cluster_1",
+      "rel": "construct_cluster",
+      "weight": 2.0
+    },
+    {
+      "src": "Critical Thinking",
+      "dst": "cluster_2",
+      "rel": "construct_cluster",
+      "weight": 1.0
+    },
+    {
+      "src": "Ethics",
+      "dst": "cluster_0",
+      "rel": "construct_cluster",
+      "weight": 1.0
+    },
+    {
+      "src": "Ethics",
+      "dst": "cluster_1",
+      "rel": "construct_cluster",
+      "weight": 1.0
+    }
+  ],
+  "metadata": {
+    "total_nodes": 12,
+    "total_edges": 15,
+    "node_types": {
+      "item": 5,
+      "construct": 4,
+      "cluster": 3
+    },
+    "edge_types": {
+      "item_construct": 5,
+      "item_cluster": 5,
+      "construct_cluster": 5
+    }
+  }
+}
