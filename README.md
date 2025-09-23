@@ -4,7 +4,7 @@
 
 Analyze AI-literacy survey instruments: extract latent constructs via vector embeddings and PCA, and use an LLM for automatic interpretation and naming.
 
-## 项目结构
+## Project Structure
 
 ```
 ai-literacy-aligns/
