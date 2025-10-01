@@ -108,6 +108,8 @@ python main_pipeline.py
 │ 处理   │ ① 添加题项ID  ② 文本标准化  ③ 质量检查                              │
 │ 输出   │ items_master.csv (清洗后), item_ids.txt, item_ids.csv             │
 └─────────────────────────────────────────────────────────────────────────────┘
+
+
 <img width="1501" height="455" alt="image" src="https://github.com/user-attachments/assets/a79cadde-cbea-4d9b-b486-b57815578575" />
 
 
