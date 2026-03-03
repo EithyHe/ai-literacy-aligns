@@ -79,6 +79,7 @@ Thumbs.db
 
 # Project specific
 data/raw/
+ssn/db/*.sqlite
 *.log
 *.tmp
 temp/
