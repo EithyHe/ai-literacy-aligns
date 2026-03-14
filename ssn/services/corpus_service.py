@@ -44,11 +44,13 @@ def get_domains(framework_id: str | None = None) -> list[dict]:
     return get_all_domains()
 
 
-def get_constructs(domain_id: str | None = None) -> list[dict]:
-    """Return constructs, optionally filtered by domain."""
-    from ssn.db.schema import get_all_constructs, get_constructs_by_domain
+def get_constructs(domain_id: str | None = None, framework_id: str | None = None) -> list[dict]:
+    """Return constructs, optionally filtered by domain or framework."""
+    from ssn.db.schema import get_all_constructs, get_constructs_by_domain, get_constructs_by_framework_id
     if domain_id:
         return get_constructs_by_domain(domain_id)
+    if framework_id:
+        return get_constructs_by_framework_id(framework_id)
     return get_all_constructs()
 
 

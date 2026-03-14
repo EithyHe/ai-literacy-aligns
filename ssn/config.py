@@ -34,3 +34,21 @@ SIMILARITY_THRESHOLDS = {
 
 STREAMLIT_PAGE_ICON = "🔬"
 STREAMLIT_TITLE = "Semantic Scale Network"
+
+# Graph visualization pipeline (PRD Section 7)
+SSN_GRAPH_JSON_PATH = PROCESSED_DIR / "ssn_graph_data.json"
+UMAP_SEED = 42
+UMAP_DOMAIN_NEIGHBORS = 15
+UMAP_DOMAIN_MIN_DIST = 0.3
+UMAP_CONSTRUCT_NEIGHBORS = 15
+UMAP_CONSTRUCT_MIN_DIST = 0.3
+UMAP_ITEM_NEIGHBORS = 15
+UMAP_ITEM_MIN_DIST = 0.3
+KNN_DOMAIN = 5
+KNN_CONSTRUCT = 5
+KNN_ITEM = 3
+# Show all edges (no threshold); similarity is labeled on each edge
+HULL_PADDING_FRACTION = 0.15
+
+# When set (e.g. "leiden_derived"), graph pipeline uses only this framework's domains for hierarchy
+PRIMARY_FRAMEWORK_ID = os.environ.get("PRIMARY_FRAMEWORK_ID", "")

@@ -39,14 +39,10 @@ def _neighbors_from_session() -> list[dict] | None:
     neighbors = sim.get("neighbors")
     if not neighbors:
         return None
-    from ssn.db.schema import get_all_constructs, get_all_frameworks, get_constructs_by_domain, get_all_domains
+    from ssn.db.schema import get_all_constructs, get_all_frameworks
     constructs = {c["construct_id"]: c for c in get_all_constructs()}
     frameworks = {f["framework_id"]: f["name"] for f in get_all_frameworks()}
-    construct_to_fw = {}
-    for d in get_all_domains():
-        for c in get_constructs_by_domain(d["domain_id"]):
-            if c.get("construct_id"):
-                construct_to_fw[c["construct_id"]] = frameworks.get(d.get("framework_id", ""), "")
+    construct_to_fw = {c["construct_id"]: frameworks.get(c.get("framework_id", ""), "") for c in constructs.values()}
     result = []
     for n in neighbors:
         cid = n.get("id", "")

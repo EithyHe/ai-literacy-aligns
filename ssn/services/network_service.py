@@ -7,6 +7,7 @@ from typing import Any
 
 import networkx as nx
 import numpy as np
+import pandas as pd
 
 from ssn.services.similarity_service import compute_pairwise_similarity
 
@@ -24,20 +25,93 @@ except ImportError:
     la = None  # type: ignore
     logger.debug("igraph/leidenalg not available; will use networkx Louvain fallback")
 
+# Optional: TMFG for clearer network visualization (fewer, stronger edges)
+try:
+    from fast_tmfg import TMFG as _TMFG
+
+    TMFG_AVAILABLE = True
+except ImportError:
+    TMFG_AVAILABLE = False
+    _TMFG = None  # type: ignore
+    logger.debug("fast-tmfg not available; network will be fully connected")
+
+
+def _apply_tmfg(
+    ids: list[str],
+    matrix: np.ndarray,
+    sim_matrix: np.ndarray,
+) -> nx.Graph:
+    """Build a Triangulated Maximally Filtered Graph from similarity matrix.
+
+    TMFG keeps at most 3n-6 edges (planar triangulation), retaining the
+    strongest similarities so the network visualization is clearer.
+    """
+    if not TMFG_AVAILABLE or _TMFG is None:
+        return None
+    n = len(ids)
+    if n < 4:
+        return None
+    try:
+        # TMFG expects non-negative weights; map similarity [-1,1] -> [0,1]
+        weights = np.clip((sim_matrix + 1.0) / 2.0, 0.0, 1.0).astype(np.float64)
+        # Covariance of constructs (rows = constructs); shape (n, n)
+        cov = np.cov(matrix, rowvar=True)
+        if cov.shape != (n, n):
+            return None
+        # fast_tmfg may call .to_numpy() on inputs; pass DataFrames to satisfy that
+        weights_df = pd.DataFrame(weights)
+        cov_df = pd.DataFrame(cov)
+        model = _TMFG()
+        _, _, adj = model.fit_transform(weights_df, "weighted_sparse_W_matrix", cov=cov_df)
+        try:
+            from scipy.sparse import issparse
+            if issparse(adj):
+                adj = adj.toarray()
+        except ImportError:
+            pass
+        adj = np.asarray(adj)
+        if adj.ndim != 2 or adj.shape[0] != n or adj.shape[1] != n:
+            return None
+        G = nx.Graph()
+        G.add_nodes_from(ids)
+        for i in range(n):
+            for j in range(i + 1, n):
+                w = adj[i, j]
+                if w is not None and float(w) != 0:
+                    # Restore original similarity as edge weight for display
+                    G.add_edge(ids[i], ids[j], weight=float(sim_matrix[i, j]))
+        if G.number_of_edges() == 0:
+            return None
+        logger.info(
+            f"TMFG: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges "
+            f"(planar, clearer layout)"
+        )
+        return G
+    except Exception as e:
+        logger.warning(f"TMFG failed, using full graph: {e}")
+        return None
+
 
 def build_construct_network(
     construct_embeddings: dict[str, np.ndarray],
     metric: str = "cosine",
+    use_tmfg: bool = True,
 ) -> nx.Graph:
-    """Build a fully-connected construct association network with similarity as edge weight.
+    """Build construct association network with similarity as edge weight.
+
+    When use_tmfg=True (default), applies TMFG (Triangulated Maximally Filtered
+    Graph) so only the strongest edges are kept (planar triangulation), making
+    the network visualization clearer. Falls back to full graph if TMFG is
+    unavailable or fails.
 
     Args:
         construct_embeddings: Dict mapping construct ID to embedding vector.
         metric: Similarity metric for pairwise comparison.
+        use_tmfg: If True, filter edges with TMFG for a clearer layout.
 
     Returns:
-        Undirected networkx Graph with nodes = construct IDs and every pair
-        connected by an edge whose weight is the pairwise similarity.
+        Undirected networkx Graph with nodes = construct IDs and edges
+        weighted by pairwise similarity (TMFG-filtered when use_tmfg=True).
     """
     if not construct_embeddings:
         logger.warning("Empty construct_embeddings; returning empty graph")
@@ -47,19 +121,23 @@ def build_construct_network(
     matrix = np.array([construct_embeddings[i] for i in ids], dtype=np.float64)
     sim_matrix = compute_pairwise_similarity(matrix, matrix, metric)
 
-    G = nx.Graph()
-    G.add_nodes_from(ids)
+    if use_tmfg:
+        G = _apply_tmfg(ids, matrix, sim_matrix)
+    else:
+        G = None
 
-    n = len(ids)
-    for i in range(n):
-        for j in range(i + 1, n):
-            sim = float(sim_matrix[i, j])
-            G.add_edge(ids[i], ids[j], weight=sim)
-
-    logger.info(
-        f"Built construct network: {G.number_of_nodes()} nodes, "
-        f"{G.number_of_edges()} edges"
-    )
+    if G is None:
+        G = nx.Graph()
+        G.add_nodes_from(ids)
+        n = len(ids)
+        for i in range(n):
+            for j in range(i + 1, n):
+                sim = float(sim_matrix[i, j])
+                G.add_edge(ids[i], ids[j], weight=sim)
+        logger.info(
+            f"Built construct network: {G.number_of_nodes()} nodes, "
+            f"{G.number_of_edges()} edges"
+        )
     return G
 
 
@@ -169,10 +247,17 @@ def detect_communities(
     if method == "leiden" and LEIDEN_AVAILABLE:
         try:
             G_ig = _nx_to_igraph(G)
+            # ModularityVertexPartition requires non-negative weights. Similarity
+            # (e.g. cosine) can be in [-1, 1]; map to [0, 1] for Leiden.
+            if G.number_of_edges() > 0:
+                raw = G_ig.es["weight"]
+                weights = [max(0.0, min(1.0, (1.0 + float(w)) / 2.0)) for w in raw]
+            else:
+                weights = None
             partition = la.find_partition(
                 G_ig,
                 la.ModularityVertexPartition,
-                weights=G_ig.es["weight"] if G.number_of_edges() > 0 else None,
+                weights=weights,
                 seed=42,
             )
             return _igraph_partition_to_communities(G, G_ig, partition)
@@ -294,17 +379,79 @@ def get_ego_network(
     return G.subgraph(nodes_in_ego).copy()
 
 
+def _umap_layout_from_similarity(
+    sim_matrix: np.ndarray,
+    ids: list[str],
+    n_neighbors: int = 15,
+    min_dist: float = 0.3,
+    random_state: int = 42,
+) -> dict[str, tuple[float, float]]:
+    """Run UMAP on similarity matrix (distance = 1 - sim). Same as main corpus pipeline. Returns id -> (x, y)."""
+    n = sim_matrix.shape[0]
+    if n < 2:
+        rng = np.random.RandomState(random_state)
+        return {ids[i]: (float(rng.randn()), float(rng.randn())) for i in range(n)}
+    sim_clip = np.clip(sim_matrix, 0.0, 1.0)
+    dist = 1.0 - sim_clip
+    np.fill_diagonal(dist, 0.0)
+    try:
+        import umap
+        n_neighbors = min(n_neighbors, n - 1)
+        if n_neighbors < 2:
+            n_neighbors = 2
+        use_random_init = n <= 50
+        reducer = umap.UMAP(
+            n_components=2,
+            n_neighbors=n_neighbors,
+            min_dist=min_dist,
+            random_state=random_state,
+            metric="precomputed",
+            init="random" if use_random_init else "spectral",
+        )
+        coords = reducer.fit_transform(dist)
+        return {ids[i]: (float(coords[i, 0]), float(coords[i, 1])) for i in range(n)}
+    except ImportError:
+        from ssn.services.decomposition_service import run_pca
+        result = run_pca(sim_clip, n_components=2)
+        coords = result["coords"]
+        return {ids[i]: (float(coords[i, 0]), float(coords[i, 1])) for i in range(n)}
+
+
+def compute_umap_layout_for_constructs(
+    construct_embeddings: dict[str, np.ndarray],
+    n_neighbors: int = 15,
+    min_dist: float = 0.3,
+    random_state: int = 42,
+) -> dict[str, tuple[float, float]]:
+    """Compute 2D UMAP layout from construct embeddings (cosine similarity). Matches main corpus pipeline layout."""
+    if not construct_embeddings:
+        return {}
+    ids = list(construct_embeddings.keys())
+    matrix = np.array([construct_embeddings[i] for i in ids], dtype=np.float64)
+    sim_matrix = compute_pairwise_similarity(matrix, matrix, "cosine")
+    sim_matrix = np.nan_to_num(sim_matrix, nan=0.0, posinf=1.0, neginf=0.0)
+    sim_matrix = np.clip(sim_matrix, -1.0, 1.0)
+    return _umap_layout_from_similarity(
+        sim_matrix, ids,
+        n_neighbors=min(n_neighbors, len(ids) - 1) if len(ids) > 1 else 2,
+        min_dist=min_dist,
+        random_state=random_state,
+    )
+
+
 def network_to_plotly_data(
     G: nx.Graph,
     layout: str = "spring",
     communities: dict[str, int] | None = None,
+    positions: dict[str, tuple[float, float]] | None = None,
 ) -> dict:
     """Convert networkx graph to Plotly-compatible node/edge data for visualization.
 
     Args:
         G: Networkx graph.
-        layout: "spring", "kamada_kawai", "circular", or "shell".
+        layout: "spring", "kamada_kawai", "circular", or "shell" (ignored if positions given).
         communities: Optional dict mapping node_id -> community_id for coloring.
+        positions: Optional precomputed node positions (e.g. from graph_data or UMAP). When set, layout is ignored.
 
     Returns:
         Dict with keys: node_x, node_y, node_text, node_color, node_ids,
@@ -322,24 +469,37 @@ def network_to_plotly_data(
             "edge_weights": [],
         }
 
-    # Layout
-    weight_key = "weight" if nx.get_edge_attributes(G, "weight") else None
-    try:
-        if layout == "spring":
-            pos = nx.spring_layout(G, seed=42, weight=weight_key)
-        elif layout == "kamada_kawai":
-            pos = nx.kamada_kawai_layout(G, weight=weight_key)
-        elif layout == "circular":
-            pos = nx.circular_layout(G)
-        elif layout == "shell":
-            pos = nx.shell_layout(G)
-        else:
-            pos = nx.spring_layout(G, seed=42, weight=weight_key)
-    except Exception as e:
-        logger.warning(f"Layout {layout} failed, using spring: {e}")
-        pos = nx.spring_layout(G, seed=42)
-
     node_list = list(G.nodes())
+    if positions is not None:
+        # Use precomputed layout (e.g. from main corpus graph_data / UMAP)
+        pos = {n: positions[n] for n in node_list if n in positions}
+        missing = [n for n in node_list if n not in pos]
+        if missing:
+            weight_key = "weight" if nx.get_edge_attributes(G, "weight") else None
+            try:
+                fallback = nx.spring_layout(G.subgraph(missing), seed=42, weight=weight_key)
+                for n in missing:
+                    pos[n] = fallback.get(n, (0.0, 0.0))
+            except Exception:
+                for n in missing:
+                    pos[n] = (0.0, 0.0)
+    else:
+        weight_key = "weight" if nx.get_edge_attributes(G, "weight") else None
+        try:
+            if layout == "spring":
+                pos = nx.spring_layout(G, seed=42, weight=weight_key)
+            elif layout == "kamada_kawai":
+                pos = nx.kamada_kawai_layout(G, weight=weight_key)
+            elif layout == "circular":
+                pos = nx.circular_layout(G)
+            elif layout == "shell":
+                pos = nx.shell_layout(G)
+            else:
+                pos = nx.spring_layout(G, seed=42, weight=weight_key)
+        except Exception as e:
+            logger.warning(f"Layout {layout} failed, using spring: {e}")
+            pos = nx.spring_layout(G, seed=42)
+
     node_x = [float(pos[n][0]) for n in node_list]
     node_y = [float(pos[n][1]) for n in node_list]
     node_text = [str(n) for n in node_list]

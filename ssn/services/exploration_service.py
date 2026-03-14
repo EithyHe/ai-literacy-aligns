@@ -138,11 +138,10 @@ def hierarchical_lookup(
     construct_embeddings: dict[str, np.ndarray],
     construct_metadata: dict[str, dict] | None = None,
 ) -> dict:
-    """Three-level fallback lookup (PRD 4.2):
+    """Lookup by construct name (domain search not supported at this stage):
 
-    1. Exact match on Domain name
-    2. Exact match on Construct name
-    3. Semantic search via embeddings
+    1. Exact match on Construct name
+    2. Semantic search via embeddings (if enabled)
 
     Args:
         query: User input (could be domain name, construct name, or free text).
@@ -154,30 +153,16 @@ def hierarchical_lookup(
 
     Returns:
         dict with keys:
-            - match_type: 'domain' | 'construct' | 'semantic'
-            - matched_entity: dict (the matched domain/construct info)
+            - match_type: 'construct' | 'semantic' (domain search not supported)
+            - matched_entity: dict (the matched construct info)
             - related_constructs: list[dict] (constructs in scope for analysis)
     """
     query_clean = (query or "").strip()
     construct_metadata = construct_metadata or {}
 
-    # 1. Exact match on Domain name
-    try:
-        domain_matches = db_search_fn("domains", query_clean)
-        for d in domain_matches:
-            if (d.get("name") or "").strip().lower() == query_clean.lower():
-                domain_id = d.get("domain_id")
-                if domain_id:
-                    related = _get_constructs_for_domain(domain_id, db_search_fn, construct_embeddings, construct_metadata)
-                    return {
-                        "match_type": "domain",
-                        "matched_entity": dict(d),
-                        "related_constructs": related,
-                    }
-    except Exception as e:
-        logger.debug("Domain search failed: %s", e)
+    # Domain search not supported at this stage; only construct name exact match (and semantic fallback).
 
-    # 2. Exact match on Construct name
+    # 1. Exact match on Construct name
     try:
         construct_matches = db_search_fn("constructs", query_clean)
         for c in construct_matches:

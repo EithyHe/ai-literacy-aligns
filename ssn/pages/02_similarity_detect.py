@@ -49,24 +49,16 @@ def _parse_items_from_csv(uploaded_file) -> list[str]:
 
 @st.cache_data(ttl=300)
 def _get_construct_metadata() -> dict[str, dict]:
-    """Build construct_id -> {name, framework}."""
+    """Build construct_id -> {name, framework} from constructs.framework_id."""
     constructs = {c["construct_id"]: dict(c) for c in get_all_constructs()}
-    from ssn.db.schema import get_all_domains, get_all_frameworks
-    domains = {d["domain_id"]: d for d in get_all_domains()}
+    from ssn.db.schema import get_all_frameworks
     frameworks = {f["framework_id"]: f["name"] for f in get_all_frameworks()}
-    from ssn.db.schema import get_constructs_by_domain
     meta: dict[str, dict] = {}
-    for d in get_all_domains():
-        for c in get_constructs_by_domain(d["domain_id"]):
-            cid = c.get("construct_id")
-            if cid:
-                meta[cid] = {
-                    "name": constructs.get(cid, {}).get("name", cid),
-                    "framework": frameworks.get(d.get("framework_id", ""), ""),
-                }
     for cid, c in constructs.items():
-        if cid not in meta:
-            meta[cid] = {"name": c.get("name", cid), "framework": ""}
+        meta[cid] = {
+            "name": c.get("name", cid),
+            "framework": frameworks.get(c.get("framework_id", ""), ""),
+        }
     return meta
 
 
@@ -106,14 +98,13 @@ def render() -> None:
         else:
             st.info("Upload a CSV with a 'text', 'item', or 'item_text' column.")
 
-    with st.sidebar:
-        st.subheader("Settings")
-        metric = st.selectbox(
-            "Similarity metric",
-            ["cosine", "euclidean", "manhattan", "dot"],
-            index=0,
-        )
-        top_n = st.slider("Top-N neighbors", min_value=1, max_value=15, value=5)
+    st.subheader("Settings")
+    metric = st.selectbox(
+        "Similarity metric",
+        ["cosine", "euclidean", "manhattan", "dot"],
+        index=0,
+    )
+    top_n = st.slider("Top-N neighbors", min_value=1, max_value=15, value=5)
 
     analyze_clicked = st.button("Analyze", type="primary")
 
@@ -154,6 +145,14 @@ def render() -> None:
     if not neighbors:
         st.info("No similar constructs found.")
     else:
+        max_items_per_construct = 5
+
+        def _top_items_text(cid: str) -> str:
+            items_list = get_items_by_construct(cid)
+            texts = [i.get("text", "") or "" for i in items_list[:max_items_per_construct]]
+            truncated = [t[:70] + "…" if len(t) > 70 else t for t in texts]
+            return " | ".join(truncated) if truncated else "—"
+
         rows = []
         for n in neighbors:
             cid = n.get("id", "")
@@ -162,6 +161,7 @@ def render() -> None:
                 "Construct": meta.get("name", cid),
                 "Similarity": f"{n.get('similarity', 0):.3f}",
                 "Framework": meta.get("framework", ""),
+                "Top-5 items": _top_items_text(cid),
             })
         st.dataframe(rows, use_container_width=True, hide_index=True)
 

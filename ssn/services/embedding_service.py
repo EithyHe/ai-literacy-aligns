@@ -160,6 +160,98 @@ def get_domain_embeddings() -> dict[str, np.ndarray]:
     return result
 
 
+# Cache for cross-framework domain links: (threshold, ) -> list of (domain_id_a, domain_id_b, similarity)
+_cross_framework_domain_links_cache: dict[float, list[tuple[str, str, float]]] = {}
+
+
+def compute_cross_framework_domain_links(threshold: float) -> list[tuple[str, str, float]]:
+    """Return domain pairs from different frameworks with cosine similarity >= threshold.
+
+    Uses get_domain_embeddings() (L2-normalized); similarity = dot product.
+    Result is cached per threshold.
+    """
+    global _cross_framework_domain_links_cache
+    if threshold in _cross_framework_domain_links_cache:
+        return _cross_framework_domain_links_cache[threshold]
+
+    from ssn.db.schema import get_all_domains
+
+    domain_embs = get_domain_embeddings()
+    domains = get_all_domains()
+    domain_to_fw: dict[str, str] = {
+        d["domain_id"]: d["framework_id"]
+        for d in domains
+        if d.get("domain_id") and d.get("framework_id")
+    }
+
+    domain_ids = [did for did in domain_embs if did in domain_to_fw]
+    if len(domain_ids) < 2:
+        _cross_framework_domain_links_cache[threshold] = []
+        return []
+
+    result: list[tuple[str, str, float]] = []
+    for i, did_a in enumerate(domain_ids):
+        fw_a = domain_to_fw[did_a]
+        vec_a = domain_embs[did_a]
+        for did_b in domain_ids[i + 1 :]:
+            if domain_to_fw[did_b] == fw_a:
+                continue
+            sim = float(np.dot(vec_a, domain_embs[did_b]))
+            if sim >= threshold:
+                result.append((did_a, did_b, sim))
+
+    _cross_framework_domain_links_cache[threshold] = result
+    logger.info(f"Computed {len(result)} cross-framework domain links (threshold={threshold})")
+    return result
+
+
+def get_cross_framework_construct_similarity(
+    construct_ids: list[str],
+    source_framework_id: str,
+    top_k: int = 3,
+    threshold: float = 0.3,
+) -> list[tuple[str, str, float]]:
+    """For each construct in construct_ids, return top-k similar constructs from other frameworks.
+
+    Returns [(source_cid, other_cid, similarity), ...]. Uses get_construct_embeddings;
+    framework_id is resolved via get_all_constructs + get_framework_id_for_construct for nulls.
+    """
+    from ssn.db.schema import get_all_constructs, get_framework_id_for_construct
+
+    construct_embs = get_construct_embeddings()
+    if not construct_embs:
+        return []
+
+    all_c = get_all_constructs()
+    fw_for_cid: dict[str, str | None] = {c["construct_id"]: c.get("framework_id") for c in all_c}
+    for cid in set(construct_embs) - set(fw_for_cid):
+        fw_for_cid[cid] = get_framework_id_for_construct(cid)
+    for cid in fw_for_cid:
+        if fw_for_cid[cid] is None:
+            fw_for_cid[cid] = get_framework_id_for_construct(cid)
+
+    result: list[tuple[str, str, float]] = []
+    for cid in construct_ids:
+        if cid not in construct_embs:
+            continue
+        if fw_for_cid.get(cid) != source_framework_id:
+            continue
+        vec = construct_embs[cid]
+        candidates: list[tuple[str, float]] = []
+        for other_cid, other_vec in construct_embs.items():
+            if other_cid == cid:
+                continue
+            if fw_for_cid.get(other_cid) == source_framework_id:
+                continue
+            sim = float(np.dot(vec, other_vec))
+            if sim >= threshold:
+                candidates.append((other_cid, sim))
+        candidates.sort(key=lambda x: -x[1])
+        for other_cid, sim in candidates[:top_k]:
+            result.append((cid, other_cid, sim))
+    return result
+
+
 def build_faiss_index(embeddings: np.ndarray) -> "faiss.Index":
     """Build a FAISS IndexFlatIP (inner product / cosine) index.
 

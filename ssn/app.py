@@ -5,8 +5,12 @@ Run with:  streamlit run ssn/app.py
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
+
+# Use TBB threading layer for Numba (thread-safe). Set before any import of numba/umap.
+os.environ.setdefault("NUMBA_THREADING_LAYER", "tbb")
 
 import streamlit as st
 

@@ -26,17 +26,14 @@ from ssn.db.schema import (
 
 @st.cache_data
 def _get_items_per_framework() -> list[dict]:
-    """Items per framework for bar chart."""
+    """Items per framework for bar chart (direct: framework -> constructs -> items)."""
+    from ssn.db.schema import get_constructs_by_framework_id
+
     frameworks = get_all_frameworks()
     result = []
     for fw in frameworks:
-        domains = get_domains_by_framework(fw["framework_id"])
-        total = 0
-        for d in domains:
-            constructs = get_constructs_by_domain(d["domain_id"])
-            for c in constructs:
-                items = get_items_by_construct(c["construct_id"])
-                total += len(items)
+        constructs = get_constructs_by_framework_id(fw["framework_id"])
+        total = sum(len(get_items_by_construct(c["construct_id"])) for c in constructs)
         result.append({"Framework": fw["name"], "Items": total})
     return result
 
@@ -82,15 +79,15 @@ def render() -> None:
 
             if framework_id:
                 tree = get_hierarchy_tree(framework_id)
-                # Build domain -> constructs mapping
-                domain_constructs: dict[str, list[dict]] = {}
+                # Group by domain (optional) then construct; constructs without domain use key (None, "Constructs")
+                domain_constructs: dict[tuple[str | None, str], list[dict]] = {}
                 for row in tree:
                     d_id = row.get("domain_id")
-                    d_name = row.get("domain_name", d_id or "Unknown")
+                    d_name = row.get("domain_name") or (d_id or "Constructs")
                     c_id = row.get("construct_id")
                     c_name = row.get("construct_name", c_id or "Unknown")
                     icount = row.get("item_count", 0)
-                    if not d_id or not c_id:
+                    if not c_id:
                         continue
                     key = (d_id, d_name)
                     if key not in domain_constructs:
@@ -98,7 +95,7 @@ def render() -> None:
                     domain_constructs[key].append({"construct_id": c_id, "name": c_name, "item_count": icount})
 
                 for (d_id, d_name), constructs in domain_constructs.items():
-                    with st.expander(f"**{d_name}** (Domain)", expanded=False):
+                    with st.expander(f"**{d_name}**", expanded=False):
                         for c in constructs:
                             with st.expander(f"{c['name']} ({c['item_count']} items)", expanded=False):
                                 items = get_items_by_construct(c["construct_id"])

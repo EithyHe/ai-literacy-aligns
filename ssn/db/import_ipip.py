@@ -228,7 +228,8 @@ def import_ipip(csv_path: str | Path | None = None, reset: bool = False) -> dict
             })
             registered_fw.add(fw_id)
 
-    # Step 2: Collect unique constructs per framework and create domains
+    # Step 2: Register all constructs with framework_id; create domains + domain_construct_map
+    # only for the 4 frameworks with real theoretical domains (IPIP-NEO, HEXACO, VIA, BFAS).
     domain_set: set[str] = set()
     construct_set: set[str] = set()
 
@@ -238,51 +239,34 @@ def import_ipip(csv_path: str | Path | None = None, reset: bool = False) -> dict
         inst_df = df[df["instrument"] == inst]
         constructs = inst_df["construct_reported"].dropna().unique()
 
-        # Group constructs into domains
-        domains_for_fw: dict[str, list[str]] = {}
-        unmapped: list[str] = []
-
         for c_name in constructs:
+            c_id = _build_construct_id(fw_id, c_name)
+            n_items = len(inst_df[inst_df["construct_reported"] == c_name])
+            if c_id not in construct_set:
+                upsert_construct({
+                    "construct_id": c_id,
+                    "name": c_name,
+                    "original_label": construct_label,
+                    "description": None,
+                    "scale_name": f"{inst} {c_name}",
+                    "item_count": n_items,
+                    "scale_source_url": None,
+                    "framework_id": fw_id,
+                })
+                construct_set.add(c_id)
+
             domain_name = _get_domain_for_construct(fw_id, c_name)
             if domain_name:
-                domains_for_fw.setdefault(domain_name, []).append(c_name)
-            else:
-                unmapped.append(c_name)
-
-        # If no domain mapping exists, create a single "General" domain
-        if not domains_for_fw and unmapped:
-            domains_for_fw["General"] = unmapped
-            unmapped = []
-        elif unmapped:
-            domains_for_fw.setdefault("Other", []).extend(unmapped)
-
-        # Register domains and constructs
-        for domain_name, construct_names in domains_for_fw.items():
-            d_id = _build_domain_id(fw_id, domain_name)
-            if d_id not in domain_set:
-                upsert_domain({
-                    "domain_id": d_id,
-                    "framework_id": fw_id,
-                    "name": domain_name,
-                    "original_label": domain_label,
-                    "description": None,
-                })
-                domain_set.add(d_id)
-
-            for c_name in construct_names:
-                c_id = _build_construct_id(fw_id, c_name)
-                n_items = len(inst_df[inst_df["construct_reported"] == c_name])
-                if c_id not in construct_set:
-                    upsert_construct({
-                        "construct_id": c_id,
-                        "name": c_name,
-                        "original_label": construct_label,
+                d_id = _build_domain_id(fw_id, domain_name)
+                if d_id not in domain_set:
+                    upsert_domain({
+                        "domain_id": d_id,
+                        "framework_id": fw_id,
+                        "name": domain_name,
+                        "original_label": domain_label,
                         "description": None,
-                        "scale_name": f"{inst} {c_name}",
-                        "item_count": n_items,
-                        "scale_source_url": None,
                     })
-                    construct_set.add(c_id)
+                    domain_set.add(d_id)
                 link_domain_construct(d_id, c_id, "primary")
 
     # Step 3: Insert items

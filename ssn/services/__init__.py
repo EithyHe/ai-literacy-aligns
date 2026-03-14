@@ -18,6 +18,10 @@ from ssn.services.network_service import (
     get_network_summary,
     network_to_plotly_data,
 )
+from ssn.services.llm_interpret_graph import (
+    build_top_items_from_leiden_communities,
+    run_ssn_leiden_domain_interpretation,
+)
 
 __all__ = [
     "MetricType",
@@ -34,4 +38,6 @@ __all__ = [
     "get_network_summary",
     "get_ego_network",
     "network_to_plotly_data",
+    "build_top_items_from_leiden_communities",
+    "run_ssn_leiden_domain_interpretation",
 ]

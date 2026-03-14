@@ -1,8 +1,8 @@
 """SQLite schema and data-access helpers for the unified hierarchy model.
 
-Tables follow PRD Section 2.2.3:
-  Framework -> Domain -> Construct -> Item
-  with N:M Domain-Construct mapping to support PID-5 cross-loadings.
+Primary path: Framework -> Construct -> Item (constructs.framework_id NOT NULL).
+Optional: Domain is only for frameworks with theoretical domains (e.g. IPIP-NEO, HEXACO, VIA, BFAS);
+  domain_construct_map links constructs to domains where defined. No synthetic General/Other domains.
 """
 
 from __future__ import annotations
@@ -33,12 +33,13 @@ CREATE TABLE IF NOT EXISTS domains (
 );
 
 CREATE TABLE IF NOT EXISTS constructs (
-    construct_id   TEXT PRIMARY KEY,
-    name           TEXT NOT NULL,
-    original_label TEXT,          -- e.g. "Facet", "Character Strength"
-    description    TEXT,
-    scale_name     TEXT,
-    item_count     INTEGER,
+    construct_id     TEXT PRIMARY KEY,
+    framework_id     TEXT NOT NULL REFERENCES frameworks(framework_id),
+    name             TEXT NOT NULL,
+    original_label   TEXT,          -- e.g. "Facet", "Character Strength"
+    description      TEXT,
+    scale_name       TEXT,
+    item_count       INTEGER,
     scale_source_url TEXT
 );
 
@@ -71,12 +72,42 @@ CREATE TABLE IF NOT EXISTS cross_framework_map (
     mapping_type   TEXT NOT NULL    -- 'equivalent' / 'approximate' / 'inverse' / 'partial'
 );
 
+-- Leiden (data-driven) clustering: separate from theory hierarchy to avoid polluting frameworks/domains.
+-- One run = one partition of constructs into communities; labels come from LLM interpretation.
+CREATE TABLE IF NOT EXISTS leiden_runs (
+    run_id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at   TEXT NOT NULL,     -- ISO 8601
+    resolution   REAL,              -- Leiden resolution param (if used)
+    random_seed  INTEGER,
+    note         TEXT
+);
+
+CREATE TABLE IF NOT EXISTS leiden_communities (
+    run_id       INTEGER NOT NULL REFERENCES leiden_runs(run_id) ON DELETE CASCADE,
+    community_id INTEGER NOT NULL,  -- 0, 1, 2, ... from algorithm
+    label        TEXT,              -- LLM-generated name
+    rationale    TEXT,
+    PRIMARY KEY (run_id, community_id)
+);
+
+CREATE TABLE IF NOT EXISTS leiden_construct_membership (
+    run_id       INTEGER NOT NULL REFERENCES leiden_runs(run_id) ON DELETE CASCADE,
+    construct_id TEXT NOT NULL REFERENCES constructs(construct_id),
+    community_id INTEGER NOT NULL,
+    PRIMARY KEY (run_id, construct_id),
+    FOREIGN KEY (run_id, community_id) REFERENCES leiden_communities(run_id, community_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_items_construct ON items(construct_id);
 CREATE INDEX IF NOT EXISTS idx_items_framework ON items(framework_id);
 CREATE INDEX IF NOT EXISTS idx_items_instrument ON items(instrument);
 CREATE INDEX IF NOT EXISTS idx_dcmap_domain ON domain_construct_map(domain_id);
 CREATE INDEX IF NOT EXISTS idx_dcmap_construct ON domain_construct_map(construct_id);
 CREATE INDEX IF NOT EXISTS idx_domains_framework ON domains(framework_id);
+CREATE INDEX IF NOT EXISTS idx_constructs_framework ON constructs(framework_id);
+CREATE INDEX IF NOT EXISTS idx_leiden_communities_run ON leiden_communities(run_id);
+CREATE INDEX IF NOT EXISTS idx_leiden_membership_run ON leiden_construct_membership(run_id);
+CREATE INDEX IF NOT EXISTS idx_leiden_membership_construct ON leiden_construct_membership(construct_id);
 """
 
 
@@ -102,10 +133,45 @@ def get_connection():
         conn.close()
 
 
+def _migrate_leiden_tables(conn: sqlite3.Connection) -> None:
+    """Create Leiden tables if missing (for DBs created before Leiden tables were in SCHEMA_SQL)."""
+    cur = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='leiden_runs'"
+    )
+    if cur.fetchone() is not None:
+        return
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS leiden_runs (
+            run_id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at   TEXT NOT NULL,
+            resolution   REAL,
+            random_seed  INTEGER,
+            note         TEXT
+        );
+        CREATE TABLE IF NOT EXISTS leiden_communities (
+            run_id       INTEGER NOT NULL REFERENCES leiden_runs(run_id) ON DELETE CASCADE,
+            community_id INTEGER NOT NULL,
+            label        TEXT,
+            rationale    TEXT,
+            PRIMARY KEY (run_id, community_id)
+        );
+        CREATE TABLE IF NOT EXISTS leiden_construct_membership (
+            run_id       INTEGER NOT NULL REFERENCES leiden_runs(run_id) ON DELETE CASCADE,
+            construct_id TEXT NOT NULL REFERENCES constructs(construct_id),
+            community_id INTEGER NOT NULL,
+            PRIMARY KEY (run_id, construct_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_leiden_communities_run ON leiden_communities(run_id);
+        CREATE INDEX IF NOT EXISTS idx_leiden_membership_run ON leiden_construct_membership(run_id);
+        CREATE INDEX IF NOT EXISTS idx_leiden_membership_construct ON leiden_construct_membership(construct_id);
+    """)
+
+
 def init_db() -> None:
-    """Create all tables if they don't exist."""
+    """Create all tables if they don't exist; run migrations for existing DBs."""
     with get_connection() as conn:
         conn.executescript(SCHEMA_SQL)
+        _migrate_leiden_tables(conn)
 
 
 def reset_db() -> None:
@@ -144,10 +210,13 @@ def upsert_construct(c: dict[str, Any]) -> None:
     with get_connection() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO constructs "
-            "(construct_id, name, original_label, description, scale_name, item_count, scale_source_url) "
+            "(construct_id, name, original_label, description, scale_name, item_count, scale_source_url, framework_id) "
             "VALUES (:construct_id, :name, :original_label, :description, "
-            ":scale_name, :item_count, :scale_source_url)",
-            c,
+            ":scale_name, :item_count, :scale_source_url, :framework_id)",
+            {
+                **c,
+                "framework_id": c.get("framework_id"),
+            },
         )
 
 
@@ -207,6 +276,106 @@ def insert_cross_framework_mapping(
 
 
 # ---------------------------------------------------------------------------
+# Leiden (data-driven clustering) – dedicated tables, not mixed with frameworks/domains
+# ---------------------------------------------------------------------------
+
+def leiden_insert_run(
+    created_at: str,
+    resolution: float | None = None,
+    random_seed: int | None = None,
+    note: str | None = None,
+) -> int:
+    """Insert a new Leiden run; returns run_id."""
+    with get_connection() as conn:
+        cur = conn.execute(
+            "INSERT INTO leiden_runs (created_at, resolution, random_seed, note) VALUES (?, ?, ?, ?)",
+            (created_at, resolution, random_seed, note),
+        )
+        return cur.lastrowid
+
+
+def leiden_insert_communities(
+    run_id: int,
+    communities: list[tuple[int, str | None, str | None]],
+) -> None:
+    """Insert (community_id, label, rationale) for a run. Replaces any existing for this run."""
+    with get_connection() as conn:
+        conn.execute("DELETE FROM leiden_communities WHERE run_id = ?", (run_id,))
+        for community_id, label, rationale in communities:
+            conn.execute(
+                "INSERT INTO leiden_communities (run_id, community_id, label, rationale) VALUES (?, ?, ?, ?)",
+                (run_id, community_id, label or None, rationale or None),
+            )
+
+
+def leiden_insert_membership(
+    run_id: int,
+    construct_id: str,
+    community_id: int,
+) -> None:
+    """Assign one construct to a community in a run."""
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO leiden_construct_membership (run_id, construct_id, community_id) VALUES (?, ?, ?)",
+            (run_id, construct_id, community_id),
+        )
+
+
+def leiden_insert_membership_bulk(run_id: int, construct_to_community: dict[str, int]) -> None:
+    """Assign all construct_id -> community_id for a run. Replaces any existing membership for this run."""
+    with get_connection() as conn:
+        conn.execute("DELETE FROM leiden_construct_membership WHERE run_id = ?", (run_id,))
+        conn.executemany(
+            "INSERT INTO leiden_construct_membership (run_id, construct_id, community_id) VALUES (?, ?, ?)",
+            [(run_id, cid, comm_id) for cid, comm_id in construct_to_community.items()],
+        )
+
+
+def leiden_get_latest_run_id() -> int | None:
+    """Return the most recent run_id, or None if no runs exist."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT run_id FROM leiden_runs ORDER BY run_id DESC LIMIT 1"
+        ).fetchone()
+        return row["run_id"] if row else None
+
+
+def leiden_get_run(run_id: int) -> dict | None:
+    """Return a single run row or None."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM leiden_runs WHERE run_id = ?", (run_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def leiden_get_construct_to_community(run_id: int) -> dict[str, int]:
+    """Return construct_id -> community_id for the given run."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT construct_id, community_id FROM leiden_construct_membership WHERE run_id = ?",
+            (run_id,),
+        ).fetchall()
+        return {r["construct_id"]: r["community_id"] for r in rows}
+
+
+def leiden_get_communities_with_labels(run_id: int) -> list[dict]:
+    """Return list of {community_id, label, rationale} for the run, ordered by community_id."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT community_id, label, rationale FROM leiden_communities WHERE run_id = ? ORDER BY community_id",
+            (run_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def leiden_delete_run(run_id: int) -> None:
+    """Delete a run and its communities/membership (CASCADE)."""
+    with get_connection() as conn:
+        conn.execute("DELETE FROM leiden_runs WHERE run_id = ?", (run_id,))
+
+
+# ---------------------------------------------------------------------------
 # Query helpers
 # ---------------------------------------------------------------------------
 
@@ -216,12 +385,17 @@ def get_all_frameworks() -> list[dict]:
         return [dict(r) for r in rows]
 
 
+# Domain names to exclude from reads (case-sensitive: "General", "Other")
+_EXCLUDED_DOMAIN_NAMES = ("General", "Other")
+
+
 def get_domains_by_framework(framework_id: str) -> list[dict]:
     with get_connection() as conn:
         rows = conn.execute(
             "SELECT * FROM domains WHERE framework_id = ?", (framework_id,)
         ).fetchall()
-        return [dict(r) for r in rows]
+        result = [dict(r) for r in rows]
+    return [d for d in result if d.get("name") not in _EXCLUDED_DOMAIN_NAMES]
 
 
 def get_constructs_by_domain(domain_id: str) -> list[dict]:
@@ -233,6 +407,50 @@ def get_constructs_by_domain(domain_id: str) -> list[dict]:
             (domain_id,),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def get_construct_to_primary_domain() -> dict[str, str]:
+    """Return mapping construct_id -> domain_id (primary domain, or first if no primary)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT construct_id, domain_id, loading_type FROM domain_construct_map "
+            "ORDER BY CASE WHEN loading_type = 'primary' THEN 0 ELSE 1 END, domain_id"
+        ).fetchall()
+    result: dict[str, str] = {}
+    for r in rows:
+        cid = r["construct_id"]
+        if cid not in result:
+            result[cid] = r["domain_id"]
+    return result
+
+
+def get_construct_to_primary_domain_for_framework(framework_id: str) -> dict[str, str]:
+    """Return construct_id -> domain_id for domains in the given framework only (primary loading)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT dcm.construct_id, dcm.domain_id, dcm.loading_type "
+            "FROM domain_construct_map dcm "
+            "JOIN domains d ON d.domain_id = dcm.domain_id AND d.framework_id = ? "
+            "ORDER BY CASE WHEN dcm.loading_type = 'primary' THEN 0 ELSE 1 END, dcm.domain_id",
+            (framework_id,),
+        ).fetchall()
+    result: dict[str, str] = {}
+    for r in rows:
+        cid = r["construct_id"]
+        if cid not in result:
+            result[cid] = r["domain_id"]
+    return result
+
+
+def delete_domains_by_framework(framework_id: str) -> None:
+    """Remove all domains for a framework and their domain_construct_map entries (for full replace)."""
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM domain_construct_map WHERE domain_id IN "
+            "(SELECT domain_id FROM domains WHERE framework_id = ?)",
+            (framework_id,),
+        )
+        conn.execute("DELETE FROM domains WHERE framework_id = ?", (framework_id,))
 
 
 def get_items_by_construct(construct_id: str) -> list[dict]:
@@ -255,10 +473,44 @@ def get_all_constructs() -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def get_constructs_by_framework(framework_id: str) -> list[dict]:
+    """Return constructs that belong to this framework (direct framework_id)."""
+    return get_constructs_by_framework_id(framework_id)
+
+
+def get_constructs_by_framework_id(framework_id: str) -> list[dict]:
+    """Return constructs for the given framework (direct query on constructs.framework_id)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM constructs WHERE framework_id = ?", (framework_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_framework_id_for_construct(construct_id: str) -> str | None:
+    """Return framework_id for a construct (direct column; domain fallback for legacy DBs)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT framework_id FROM constructs WHERE construct_id = ?",
+            (construct_id,),
+        ).fetchone()
+        if row and row[0]:
+            return row[0]
+        row = conn.execute(
+            "SELECT d.framework_id FROM domain_construct_map dcm "
+            "JOIN domains d ON d.domain_id = dcm.domain_id "
+            "WHERE dcm.construct_id = ? "
+            "ORDER BY CASE WHEN dcm.loading_type = 'primary' THEN 0 ELSE 1 END LIMIT 1",
+            (construct_id,),
+        ).fetchone()
+        return row[0] if row else None
+
+
 def get_all_domains() -> list[dict]:
     with get_connection() as conn:
         rows = conn.execute("SELECT * FROM domains").fetchall()
-        return [dict(r) for r in rows]
+        result = [dict(r) for r in rows]
+    return [d for d in result if d.get("name") not in _EXCLUDED_DOMAIN_NAMES]
 
 
 def search_by_name(table: str, name: str, limit: int = 20) -> list[dict]:
@@ -290,11 +542,15 @@ def get_framework_count() -> int:
 
 
 def get_corpus_stats() -> dict:
-    """Return summary statistics about the corpus."""
+    """Return summary statistics about the corpus. Domains count excludes synthetic General/Other."""
     with get_connection() as conn:
+        domain_count = conn.execute(
+            "SELECT COUNT(*) FROM domains WHERE name NOT IN (?, ?)",
+            _EXCLUDED_DOMAIN_NAMES,
+        ).fetchone()[0]
         return {
             "frameworks": conn.execute("SELECT COUNT(*) FROM frameworks").fetchone()[0],
-            "domains": conn.execute("SELECT COUNT(*) FROM domains").fetchone()[0],
+            "domains": domain_count,
             "constructs": conn.execute("SELECT COUNT(*) FROM constructs").fetchone()[0],
             "items": conn.execute("SELECT COUNT(*) FROM items").fetchone()[0],
             "instruments": conn.execute(
@@ -314,7 +570,7 @@ def get_cross_framework_mappings() -> list[dict]:
 
 
 def get_hierarchy_tree(framework_id: str | None = None) -> list[dict]:
-    """Return the full hierarchy as a nested structure for display."""
+    """Return the full hierarchy: framework -> (optional domain) -> construct -> item_count."""
     with get_connection() as conn:
         fw_clause = "WHERE f.framework_id = ?" if framework_id else ""
         params = (framework_id,) if framework_id else ()
@@ -325,9 +581,9 @@ def get_hierarchy_tree(framework_id: str | None = None) -> list[dict]:
                    c.construct_id, c.name AS construct_name,
                    COUNT(i.item_id) AS item_count
             FROM frameworks f
-            LEFT JOIN domains d ON d.framework_id = f.framework_id
-            LEFT JOIN domain_construct_map dcm ON dcm.domain_id = d.domain_id
-            LEFT JOIN constructs c ON c.construct_id = dcm.construct_id
+            JOIN constructs c ON c.framework_id = f.framework_id
+            LEFT JOIN domain_construct_map dcm ON dcm.construct_id = c.construct_id
+            LEFT JOIN domains d ON d.domain_id = dcm.domain_id
             LEFT JOIN items i ON i.construct_id = c.construct_id
                 AND i.framework_id = f.framework_id
             {fw_clause}

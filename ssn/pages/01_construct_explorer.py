@@ -34,8 +34,8 @@ from ssn.db.schema import (
     get_all_constructs,
     get_all_domains,
     get_all_frameworks,
-    search_by_name,
     get_constructs_by_domain,
+    search_by_name,
 )
 from ssn.components.scatter_viz import plot_density_scatter
 from ssn.components.network_viz import plot_network_from_plotly_data
@@ -48,32 +48,24 @@ def _dummy_encode(_texts: list) -> np.ndarray:
 
 @st.cache_data(ttl=300)
 def _get_construct_metadata() -> dict[str, dict]:
-    """Build construct_id -> {name, framework, domain, item_count, description}."""
+    """Build construct_id -> {name, framework, domain, item_count, description}. Uses constructs.framework_id; domain from domain_construct_map when present."""
+    from ssn.db.schema import get_construct_to_primary_domain
+
     constructs = {c["construct_id"]: dict(c) for c in get_all_constructs()}
     frameworks = {f["framework_id"]: f["name"] for f in get_all_frameworks()}
-    domains = get_all_domains()
+    construct_to_domain = get_construct_to_primary_domain()
+    domains_by_id = {d["domain_id"]: d.get("name", "") for d in get_all_domains()}
     meta: dict[str, dict] = {}
-    for d in domains:
-        fw_name = frameworks.get(d.get("framework_id", ""), "")
-        for c in get_constructs_by_domain(d["domain_id"]):
-            cid = c.get("construct_id")
-            if cid:
-                meta[cid] = {
-                    "name": constructs.get(cid, {}).get("name", cid),
-                    "framework": fw_name,
-                    "domain": d.get("name", ""),
-                    "item_count": constructs.get(cid, {}).get("item_count", 0),
-                    "description": constructs.get(cid, {}).get("description") or "",
-                }
     for cid, c in constructs.items():
-        if cid not in meta:
-            meta[cid] = {
-                "name": c.get("name", cid),
-                "framework": "",
-                "domain": "",
-                "item_count": c.get("item_count", 0),
-                "description": c.get("description") or "",
-            }
+        fw_id = c.get("framework_id", "")
+        domain_name = domains_by_id.get(construct_to_domain.get(cid, ""), "")
+        meta[cid] = {
+            "name": c.get("name", cid),
+            "framework": frameworks.get(fw_id, ""),
+            "domain": domain_name,
+            "item_count": c.get("item_count", 0),
+            "description": c.get("description") or "",
+        }
     return meta
 
 
@@ -94,18 +86,18 @@ def _get_umap_coords_and_ids(construct_ids: tuple[str, ...]) -> tuple[np.ndarray
 def render() -> None:
     st.title("Construct Explorer")
     st.markdown(
-        "Search by **construct name** or **domain name** (exact match). "
-        "View the matched definition and related constructs."
+        "Search by **construct name** (exact match). "
+        "View the matched definition and related constructs. Searching by domains is not supported at this stage."
     )
 
     query_text = st.text_input(
-        "Construct or domain name",
-        placeholder="E.g., Extraversion, Openness, Gregariousness",
+        "Construct name",
+        placeholder="E.g., Extraversion, Gregariousness, Imagination",
     )
     search_clicked = st.button("Search", type="primary")
 
     if not query_text or not query_text.strip():
-        st.warning("Please enter a construct or domain name.")
+        st.warning("Please enter a construct name.")
         return
 
     if not search_clicked:
@@ -137,7 +129,7 @@ def render() -> None:
     if lookup["match_type"] == "semantic":
         st.info(
             f"No exact match found for **{query_text.strip()}**. "
-            "Please enter an existing construct or domain name."
+            "Please enter an existing construct name."
         )
         return
 
