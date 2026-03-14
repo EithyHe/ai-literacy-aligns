@@ -1,0 +1,25 @@
+# SSN (Semantic Scale Network) — Streamlit app dependencies
+# Install: pip install -r ssn/requirements.txt
+# Run from project root: streamlit run ssn/app.py
+
+# App & UI
+streamlit>=1.30
+plotly>=5.18
+
+# Data & arrays
+numpy>=1.24
+pandas>=2.0
+scipy>=1.11
+
+# ML & embeddings
+scikit-learn>=1.3
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.0
+torch>=2.0
+
+# Graph & network
+networkx>=3.0
+
+# Optional: OpenAI embeddings & LLM domain naming (set OPENAI_API_KEY)
+openai>=1.40.0
+python-dotenv>=1.0
