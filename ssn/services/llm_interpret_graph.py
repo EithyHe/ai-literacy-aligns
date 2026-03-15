@@ -24,13 +24,18 @@ from ssn.services.embedding_service import load_item_embeddings
 
 logger = logging.getLogger(__name__)
 
-# Optional: load .env from project root (same pattern as src/llm_interpret_graph)
+# Optional: load .env from project root and ssn/.env
 try:
     import dotenv
+
     _project_root = Path(__file__).resolve().parent.parent.parent
-    _env = _project_root / ".env"
-    if _env.exists():
-        dotenv.load_dotenv(_env)
+    _env_candidates = [
+        _project_root / ".env",
+        _project_root / "ssn" / ".env",
+    ]
+    for _env in _env_candidates:
+        if _env.exists():
+            dotenv.load_dotenv(_env, override=False)
 except ImportError:
     pass
 

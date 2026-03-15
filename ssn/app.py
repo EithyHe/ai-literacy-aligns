@@ -9,8 +9,9 @@ import os
 import sys
 from pathlib import Path
 
-# Use TBB threading layer for Numba (thread-safe). Set before any import of numba/umap.
-os.environ.setdefault("NUMBA_THREADING_LAYER", "tbb")
+# Use a broadly available Numba threading layer by default.
+# Users can still override with NUMBA_THREADING_LAYER in their shell.
+os.environ.setdefault("NUMBA_THREADING_LAYER", "workqueue")
 
 import streamlit as st
 
@@ -61,6 +62,18 @@ def _ensure_db() -> None:
         st.stop()
 
 
+def _ensure_required_dependencies() -> None:
+    """Fail fast for hard dependencies required by visualization pages."""
+    try:
+        import hdbscan  # noqa: F401
+    except ImportError:
+        st.error(
+            "Missing dependency `hdbscan`. "
+            "Please run: `pip install -r requirements.txt -r ssn/requirements.txt`"
+        )
+        st.stop()
+
+
 # ── Page configuration ──────────────────────────────────────────────────────
 
 st.set_page_config(
@@ -72,6 +85,7 @@ st.set_page_config(
 
 _init_session_state()
 _ensure_db()
+_ensure_required_dependencies()
 
 # ── Sidebar navigation ─────────────────────────────────────────────────────
 

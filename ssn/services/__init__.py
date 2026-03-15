@@ -22,6 +22,20 @@ from ssn.services.llm_interpret_graph import (
     build_top_items_from_leiden_communities,
     run_ssn_leiden_domain_interpretation,
 )
+from ssn.services.visualization_service import (
+    build_cluster_diagnostics,
+    compute_umap,
+    get_construct_embedding_table,
+    get_item_embedding_table,
+    llm_interpret_cluster_labels,
+    run_hdbscan,
+)
+from ssn.services.visualization_cache_service import (
+    VIS_CACHE_DIR,
+    build_visualization_cache,
+    clear_visualization_cache_memory,
+    get_visualization_cache,
+)
 
 __all__ = [
     "MetricType",
@@ -38,6 +52,16 @@ __all__ = [
     "get_network_summary",
     "get_ego_network",
     "network_to_plotly_data",
+    "get_item_embedding_table",
+    "get_construct_embedding_table",
+    "compute_umap",
+    "run_hdbscan",
+    "llm_interpret_cluster_labels",
+    "build_cluster_diagnostics",
+    "VIS_CACHE_DIR",
+    "build_visualization_cache",
+    "get_visualization_cache",
+    "clear_visualization_cache_memory",
     "build_top_items_from_leiden_communities",
     "run_ssn_leiden_domain_interpretation",
 ]

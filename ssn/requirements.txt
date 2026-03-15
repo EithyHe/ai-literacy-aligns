@@ -13,6 +13,7 @@ scipy>=1.11
 
 # ML & embeddings
 scikit-learn>=1.3
+hdbscan>=0.8.33
 faiss-cpu>=1.7.4
 sentence-transformers>=2.2.0
 torch>=2.0
@@ -23,3 +24,4 @@ networkx>=3.0
 # Optional: OpenAI embeddings & LLM domain naming (set OPENAI_API_KEY)
 openai>=1.40.0
 python-dotenv>=1.0
+requests>=2.31

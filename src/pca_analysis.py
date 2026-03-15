@@ -45,7 +45,8 @@ def run_pca_analysis(
     candidate_text_cols = ["text_norm","text","item_text","stem"]
     text_col = next((c for c in candidate_text_cols if c in items.columns), None)
     if text_col is None:
-        items[text_col := "text"] = ""
+        text_col = "text"
+        items[text_col] = ""
     key_cols = ["item_id", text_col]
     if "construct" in items.columns:
         key_cols.append("construct")

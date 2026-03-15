@@ -92,53 +92,131 @@ def _apply_tmfg(
         return None
 
 
+def _build_threshold_network(
+    ids: list[str],
+    sim_matrix: np.ndarray,
+    min_weight: float = 0.2,
+) -> nx.Graph:
+    """Build a thresholded construct graph from similarity matrix."""
+    G = nx.Graph()
+    G.add_nodes_from(ids)
+    n = len(ids)
+    for i in range(n):
+        for j in range(i + 1, n):
+            sim = float(sim_matrix[i, j])
+            if sim >= min_weight:
+                G.add_edge(ids[i], ids[j], weight=sim)
+    return G
+
+
+def _apply_disparity_backbone(G: nx.Graph, alpha: float = 0.05) -> nx.Graph:
+    """Apply disparity filter backbone extraction on a weighted undirected graph.
+
+    Keep edge (i, j) if alpha_ij < alpha OR alpha_ji < alpha.
+    """
+    B = nx.Graph()
+    B.add_nodes_from(G.nodes(data=True))
+    if G.number_of_edges() == 0:
+        return B
+
+    strengths: dict[str, float] = {}
+    degrees: dict[str, int] = {}
+    for node in G.nodes():
+        weights = [float(data.get("weight", 0.0)) for _, _, data in G.edges(node, data=True)]
+        strengths[node] = float(sum(weights))
+        degrees[node] = int(G.degree(node))
+
+    def edge_alpha(u: str, v: str, w: float) -> float:
+        k = degrees.get(u, 0)
+        s = strengths.get(u, 0.0)
+        if k <= 1 or s <= 0:
+            return 0.0
+        p_ij = max(0.0, min(1.0, w / s))
+        return float((1.0 - p_ij) ** (k - 1))
+
+    for u, v, data in G.edges(data=True):
+        w = float(data.get("weight", 0.0))
+        a_uv = edge_alpha(u, v, w)
+        a_vu = edge_alpha(v, u, w)
+        if a_uv < alpha or a_vu < alpha:
+            B.add_edge(u, v, **data)
+    return B
+
+
 def build_construct_network(
     construct_embeddings: dict[str, np.ndarray],
     metric: str = "cosine",
-    use_tmfg: bool = True,
+    mode: str = "backbone",
+    backbone_method: str = "disparity",
+    alpha: float = 0.05,
+    min_weight: float = 0.2,
+    use_tmfg: bool | None = None,
 ) -> nx.Graph:
-    """Build construct association network with similarity as edge weight.
-
-    When use_tmfg=True (default), applies TMFG (Triangulated Maximally Filtered
-    Graph) so only the strongest edges are kept (planar triangulation), making
-    the network visualization clearer. Falls back to full graph if TMFG is
-    unavailable or fails.
+    """Build construct association network with full/backbone modes.
 
     Args:
         construct_embeddings: Dict mapping construct ID to embedding vector.
         metric: Similarity metric for pairwise comparison.
-        use_tmfg: If True, filter edges with TMFG for a clearer layout.
+        mode: "full" or "backbone".
+        backbone_method: "disparity" (default) or "tmfg".
+        alpha: Disparity significance threshold.
+        min_weight: Edge threshold for full graph construction.
+        use_tmfg: Deprecated compatibility flag. If True and mode is not set to
+            full explicitly, forces backbone_method="tmfg".
 
     Returns:
-        Undirected networkx Graph with nodes = construct IDs and edges
-        weighted by pairwise similarity (TMFG-filtered when use_tmfg=True).
+        Undirected networkx Graph with weighted construct edges.
     """
     if not construct_embeddings:
         logger.warning("Empty construct_embeddings; returning empty graph")
         return nx.Graph()
 
+    mode_norm = (mode or "backbone").lower()
+    if mode_norm not in {"full", "backbone"}:
+        raise ValueError(f"mode must be 'full' or 'backbone', got {mode!r}")
+    backbone_method_norm = (backbone_method or "disparity").lower()
+    if backbone_method_norm not in {"disparity", "tmfg"}:
+        raise ValueError(
+            f"backbone_method must be 'disparity' or 'tmfg', got {backbone_method!r}"
+        )
+    if use_tmfg is True and mode_norm != "full":
+        backbone_method_norm = "tmfg"
+
     ids = list(construct_embeddings.keys())
     matrix = np.array([construct_embeddings[i] for i in ids], dtype=np.float64)
     sim_matrix = compute_pairwise_similarity(matrix, matrix, metric)
+    sim_matrix = np.nan_to_num(sim_matrix, nan=0.0, posinf=1.0, neginf=-1.0)
+    sim_matrix = np.clip(sim_matrix, -1.0, 1.0)
 
-    if use_tmfg:
-        G = _apply_tmfg(ids, matrix, sim_matrix)
-    else:
-        G = None
-
-    if G is None:
-        G = nx.Graph()
-        G.add_nodes_from(ids)
-        n = len(ids)
-        for i in range(n):
-            for j in range(i + 1, n):
-                sim = float(sim_matrix[i, j])
-                G.add_edge(ids[i], ids[j], weight=sim)
+    full_graph = _build_threshold_network(ids, sim_matrix, min_weight=min_weight)
+    if mode_norm == "full":
         logger.info(
-            f"Built construct network: {G.number_of_nodes()} nodes, "
-            f"{G.number_of_edges()} edges"
+            "Construct network(full): %s nodes, %s edges, min_weight=%.3f",
+            full_graph.number_of_nodes(),
+            full_graph.number_of_edges(),
+            min_weight,
         )
-    return G
+        return full_graph
+
+    if backbone_method_norm == "tmfg":
+        tmfg_graph = _apply_tmfg(ids, matrix, sim_matrix)
+        if tmfg_graph is not None:
+            logger.info(
+                "Construct network(backbone=tmfg): %s nodes, %s edges",
+                tmfg_graph.number_of_nodes(),
+                tmfg_graph.number_of_edges(),
+            )
+            return tmfg_graph
+        logger.warning("TMFG unavailable/failed; falling back to disparity backbone")
+
+    backbone = _apply_disparity_backbone(full_graph, alpha=alpha)
+    logger.info(
+        "Construct network(backbone=disparity): %s nodes, %s edges (full=%s edges)",
+        backbone.number_of_nodes(),
+        backbone.number_of_edges(),
+        full_graph.number_of_edges(),
+    )
+    return backbone
 
 
 def compute_network_metrics(G: nx.Graph) -> dict[str, dict[str, float]]:

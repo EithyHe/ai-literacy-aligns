@@ -6,6 +6,7 @@ from ssn.components.heatmap_viz import (
     plot_cross_similarity_heatmap,
     plot_similarity_heatmap,
 )
+from ssn.components.cytoscape_viz import render_construct_network
 from ssn.components.network_viz import (
     plot_network,
     plot_network_from_plotly_data,
@@ -20,6 +21,7 @@ from ssn.components.scatter_viz import (
 __all__ = [
     "plot_network",
     "plot_network_from_plotly_data",
+    "render_construct_network",
     "plot_similarity_heatmap",
     "plot_cross_similarity_heatmap",
     "plot_embedding_scatter",
