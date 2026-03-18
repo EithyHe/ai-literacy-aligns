@@ -4,6 +4,16 @@ from pathlib import Path
 import os
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+# Load .env before reading any env vars so keys are available everywhere
+try:
+    import dotenv
+    for _env in [PROJECT_ROOT / ".env", PROJECT_ROOT / "ssn" / ".env"]:
+        if _env.exists():
+            dotenv.load_dotenv(_env, override=False)
+            break
+except ImportError:
+    pass
 DATA_DIR = PROJECT_ROOT / "data"
 INTERIM_DIR = DATA_DIR / "interim"
 PROCESSED_DIR = DATA_DIR / "processed"
@@ -20,6 +30,7 @@ IPIP_ITEM_IDS_CSV = PROCESSED_DIR / "item_ids_ipip.csv"
 FAISS_INDEX_PATH = PROCESSED_DIR / "ssn_faiss.index"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 EMBEDDING_MODEL = "text-embedding-3-small"
 EMBEDDING_DIM = 768
 LLM_MODEL = "gpt-4o"

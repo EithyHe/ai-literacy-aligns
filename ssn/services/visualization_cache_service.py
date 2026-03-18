@@ -262,7 +262,7 @@ def _cluster_name_bundle(
             umap_df=points_df,
             labels=arr,
             embeddings=embeddings,
-            model="gpt-4o-mini",
+            model="claude-haiku-4-5-20251001",
             temperature=0.2,
             max_items_per_cluster=10,
         )
@@ -466,9 +466,10 @@ def build_visualization_cache(
         construct_points,
         id_col="construct_id",
     )
+    construct_umap_coords = construct_points[["x", "y"]].values
     construct_hdb = run_hdbscan(
-        embeddings=construct_emb_aligned,
-        min_cluster_size=max(2, min(12, int(selected_mcs))),
+        embeddings=construct_umap_coords,
+        min_cluster_size=max(2, int(selected_mcs)),
         min_samples=selected_ms,
     )
     construct_labels = construct_hdb["labels"]
@@ -567,6 +568,65 @@ def build_visualization_cache(
     )
     clear_visualization_cache_memory()
     logger.info("Visualization cache built successfully: %s", file_paths["manifest"])
+    return manifest
+
+
+def patch_llm_cluster_labels(
+    cache_dir: Path | None = None,
+    model: str = "gpt-4o-mini",
+    temperature: float = 0.2,
+    max_items_per_cluster: int = 10,
+) -> dict[str, Any]:
+    """Re-run LLM cluster labeling on existing cached UMAP/HDBSCAN results.
+
+    Updates construct_points.csv and the manifest in-place without rebuilding
+    the full UMAP/HDBSCAN/network artifacts.  Returns the updated manifest.
+    """
+    target = cache_dir or VIS_CACHE_DIR
+    pts_path = target / "construct_points.csv"
+    manifest_path = target / "manifest.json"
+
+    if not pts_path.exists():
+        raise FileNotFoundError(f"construct_points.csv not found at {pts_path}")
+
+    pts = pd.read_csv(pts_path)
+    pts["hdbscan_label"] = pd.to_numeric(pts["hdbscan_label"], errors="coerce").fillna(-1).astype(int)
+    labels = pts["hdbscan_label"].values
+
+    # Align full construct embeddings to pts row order
+    construct_meta, construct_emb = get_construct_embedding_table()
+    construct_emb_aligned = _align_embeddings_to_meta(
+        construct_meta, construct_emb, pts, id_col="construct_id"
+    )
+
+    # Drop stale cluster columns so _cluster_name_bundle writes them fresh
+    pts_base = pts.drop(
+        columns=[c for c in ["cluster_display_name", "cluster_label", "cluster_rationale", "cluster_color", "hdbscan_label"] if c in pts.columns],
+        errors="ignore",
+    )
+
+    updated_pts, color_map, cluster_meta = _cluster_name_bundle(
+        points_df=pts_base,
+        labels=labels,
+        embeddings=construct_emb_aligned,
+        use_llm=True,
+    )
+    updated_pts.to_csv(pts_path, index=False, encoding="utf-8")
+
+    # Update manifest
+    manifest: dict[str, Any] = {}
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.setdefault("params", {})["use_llm_labels"] = True
+    manifest["cluster_meta"] = manifest.get("cluster_meta", {})
+    manifest["cluster_meta"]["construct"] = {
+        **cluster_meta,
+        "cluster_color_map": color_map,
+    }
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    clear_visualization_cache_memory()
+    logger.info("LLM cluster labels patched into %s", pts_path)
     return manifest
 
 

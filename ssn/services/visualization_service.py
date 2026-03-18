@@ -348,44 +348,11 @@ def _build_cluster_top_items(
     return pd.DataFrame(rows).sort_values(["cluster", "centrality"], ascending=[True, False]).reset_index(drop=True)
 
 
-@lru_cache(maxsize=24)
-def _llm_interpret_clusters_cached(
-    top_items_payload_json: str,
-    model: str = "gpt-4o-mini",
-    temperature: float = 0.2,
-) -> tuple[tuple[int, str, str], ...]:
-    from ssn.services.llm_interpret_graph import run_ssn_leiden_domain_interpretation
-
-    rows = json.loads(top_items_payload_json)
-    top_items_df = pd.DataFrame(rows)
-    if top_items_df.empty:
-        return tuple()
-
-    result = run_ssn_leiden_domain_interpretation(
-        top_items_df=top_items_df,
-        out_csv=None,
-        model=model,
-        temperature=float(temperature),
-    )
-    if result is None or result.empty:
-        return tuple()
-
-    out: list[tuple[int, str, str]] = []
-    for _, row in result.iterrows():
-        cid = _safe_cluster_int(row.get("cluster"))
-        if cid is None:
-            continue
-        label = str(row.get("label") or "").strip()
-        rationale = str(row.get("rationale") or "").strip()
-        out.append((int(cid), label, rationale))
-    return tuple(out)
-
-
 def llm_interpret_cluster_labels(
     umap_df: pd.DataFrame,
     labels: np.ndarray,
     embeddings: np.ndarray,
-    model: str = "gpt-4o-mini",
+    model: str = "claude-haiku-4-5-20251001",
     temperature: float = 0.2,
     max_items_per_cluster: int = 10,
 ) -> dict[int, dict[str, str]]:
@@ -409,25 +376,29 @@ def llm_interpret_cluster_labels(
     if top_items_df.empty:
         return {cid: {"label": f"Cluster {cid}", "rationale": ""} for cid in unique_clusters}
 
-    payload_json = top_items_df.to_json(orient="records", force_ascii=False)
-    try:
-        rows = _llm_interpret_clusters_cached(
-            payload_json,
-            model=model,
-            temperature=float(temperature),
-        )
-    except Exception:
-        rows = tuple()
+    from ssn.services.llm_interpret_graph import run_ssn_leiden_domain_interpretation
 
     mapping: dict[int, dict[str, str]] = {
         int(cid): {"label": f"Cluster {int(cid)}", "rationale": ""}
         for cid in unique_clusters
     }
-    for cid, label, rationale in rows:
-        if cid not in mapping:
-            continue
-        clean_label = label if label else f"Cluster {cid}"
-        mapping[cid] = {"label": clean_label, "rationale": rationale}
+    try:
+        result = run_ssn_leiden_domain_interpretation(
+            top_items_df=top_items_df,
+            out_csv=None,
+            model=model,
+            temperature=float(temperature),
+        )
+        if result is not None and not result.empty:
+            for _, row in result.iterrows():
+                cid = _safe_cluster_int(row.get("cluster"))
+                if cid is None or cid not in mapping:
+                    continue
+                label = str(row.get("label") or "").strip()
+                if label:
+                    mapping[cid] = {"label": label, "rationale": str(row.get("rationale") or "").strip()}
+    except Exception as e:
+        logger.warning("llm_interpret_cluster_labels failed: %s", e)
     return mapping
 
 

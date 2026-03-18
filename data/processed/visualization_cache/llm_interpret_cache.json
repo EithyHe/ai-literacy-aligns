@@ -1,0 +1,53 @@
+{
+  "prompt_version": "v1",
+  "entries": {
+    "e69947780d1d437d626429c6": {
+      "label": "Emotional Stability",
+      "rationale": "This community clusters constructs centered on the capacity to maintain emotional equilibrium, manage negative affect (anger, anxiety), and remain calm under stress—the core dimension of Emotional Stability or low Neuroticism.",
+      "model": "claude-haiku-4-5-20251001",
+      "cached_at": "2026-03-17T21:28:03.430337+00:00"
+    },
+    "a73bc35415b424ed49ad1539": {
+      "label": "Emotional Stability & Prosociality",
+      "rationale": "This community integrates emotional regulation (Emotional Stability, Neuroticism, Emotionality) with interpersonal warmth and compassion (Agreeableness, Empathy, Compassion, Gentleness), reflecting a dimension of affective balance paired with other-oriented concern.",
+      "model": "claude-haiku-4-5-20251001",
+      "cached_at": "2026-03-17T21:28:03.430337+00:00"
+    },
+    "5d98d9893b7aacda1ec0e9e0": {
+      "label": "Openness to Experience",
+      "rationale": "This community clusters constructs centered on intellectual curiosity, cognitive engagement, creative thinking, and receptiveness to novel ideas—the core facets of Openness to Experience.",
+      "model": "claude-haiku-4-5-20251001",
+      "cached_at": "2026-03-17T21:28:03.430337+00:00"
+    },
+    "49643cdecaa20c6b143fca83": {
+      "label": "Extraversion and Social Assertiveness",
+      "rationale": "This community clusters constructs centered on outward-directed social engagement, confidence in interpersonal contexts, and dominant/assertive behavioral tendencies, core to the Extraversion dimension.",
+      "model": "claude-haiku-4-5-20251001",
+      "cached_at": "2026-03-17T21:28:03.430337+00:00"
+    },
+    "140284e81718eca89e6921d9": {
+      "label": "Extraversion and Behavioral Approach",
+      "rationale": "This community clusters social engagement (sociability, gregariousness), approach-oriented motivation (excitement-seeking, risk-taking, adventurousness), and playfulness, reflecting the core extraversion dimension alongside approach-system activation and behavioral disinhibition.",
+      "model": "claude-haiku-4-5-20251001",
+      "cached_at": "2026-03-17T21:28:03.430337+00:00"
+    },
+    "ec8f789bbbae43010065df97": {
+      "label": "Impulse Control & Self-Regulation",
+      "rationale": "This community captures the capacity to inhibit immediate impulses, maintain deliberate control over behavior, and sustain organized self-directed action—core facets of behavioral constraint and executive functioning.",
+      "model": "claude-haiku-4-5-20251001",
+      "cached_at": "2026-03-17T21:28:03.430337+00:00"
+    },
+    "848c901ebaa116e06a602112": {
+      "label": "Conscientiousness and Competence",
+      "rationale": "This community clusters constructs centered on self-discipline, achievement-striving, perseverance, and competence—the core facets of Conscientiousness—alongside related competence and efficiency dimensions that reflect organized, goal-directed behavior and capability.",
+      "model": "claude-haiku-4-5-20251001",
+      "cached_at": "2026-03-17T21:28:03.430337+00:00"
+    },
+    "046ab45bad439a3423d805c9": {
+      "label": "Openness to Experience",
+      "rationale": "This community integrates aesthetic appreciation, imagination, and romanticism (core Openness facets) with orderliness and perfectionism, reflecting the broader dimension of cognitive engagement with complexity, aesthetics, and organized thinking rather than simple tidiness.",
+      "model": "claude-haiku-4-5-20251001",
+      "cached_at": "2026-03-17T21:28:03.430337+00:00"
+    }
+  }
+}
